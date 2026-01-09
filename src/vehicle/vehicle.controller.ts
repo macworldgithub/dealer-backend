@@ -26,6 +26,7 @@ import { Roles } from '../auth/decorators/roles.decorators';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from 'src/Schema/user.schema';
 import { VehicleQueryDto } from './dto/vehicle-query.dto';
+import { PresignedFileDto } from 'src/common/dto/presigned-file.dto';
 
 @ApiTags('Vehicle')
 @ApiBearerAuth('access-token')
@@ -74,5 +75,21 @@ export class VehicleController {
   @Roles(UserRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.vehicleService.delete(id);
+  }
+
+  @Post('presigned/car-image')
+  @ApiOperation({
+    summary: 'User: Get presigned URL for vehicle car image upload',
+  })
+  @ApiOkResponse({ description: 'Presigned URL generated' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions' })
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.SERVICE_ADVISOR,
+    UserRole.SALES_INVENTORY_MANAGER,
+    UserRole.PORTER_DETAILER,
+  )
+  presignedVehicleCarImage(@Body() dto: PresignedFileDto) {
+    return this.vehicleService.getVehicleCarImagePresigned(dto.fileType);
   }
 }

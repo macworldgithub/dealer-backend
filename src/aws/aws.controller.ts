@@ -10,13 +10,13 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AwsService } from './aws.service';
+import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
+import { GetSignedUrlDto } from 'src/common/dto/get-signed-url.sto';
 
 @Controller('aws')
 export class AwsController {
   constructor(private readonly awsService: AwsService) {}
 
- 
- 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
@@ -46,5 +46,20 @@ export class AwsController {
       key,
       url: signedUrl,
     };
+  }
+
+  @Post('signed-url')
+  @ApiOperation({ summary: 'Get signed GET URL for an S3 object key' })
+  @ApiOkResponse({
+    description: 'Signed URL generated',
+    schema: {
+      example: {
+        url: 'https://bucket.s3.amazonaws.com/vehicles/car-images/....?X-Amz-Signature=...',
+      },
+    },
+  })
+  async getSignedUrl(@Body() dto: GetSignedUrlDto) {
+    const url = await this.awsService.getSignedUrl(dto.key);
+    return { url };
   }
 }

@@ -274,4 +274,56 @@ export class InspectionService {
     if (!updated) throw new NotFoundException('Inspection not found');
     return updated;
   }
+
+  async getInspectionOriginalPresigned(fileType: string) {
+    this.validateImageMime(fileType);
+
+    const ext = this.extFromMime(fileType);
+    const fileName = `original.${ext}`;
+    const folder = 'inspections/original';
+
+    return this.awsService.generatePresignedUrl(fileName, fileType, folder);
+  }
+
+  async getInspectionAnalysedPresigned(fileType: string) {
+    this.validateImageMime(fileType);
+
+    const ext = this.extFromMime(fileType);
+    const fileName = `analysed.${ext}`;
+    const folder = 'inspections/analysed';
+
+    return this.awsService.generatePresignedUrl(fileName, fileType, folder);
+  }
+
+  async getInspectionDamagePresigned(fileType: string) {
+    this.validateImageMime(fileType);
+
+    const ext = this.extFromMime(fileType);
+    const fileName = `damage.${ext}`;
+    const folder = 'inspections/damages';
+
+    return this.awsService.generatePresignedUrl(fileName, fileType, folder);
+  }
+
+  private validateImageMime(fileType: string) {
+    if (!fileType || typeof fileType !== 'string') {
+      throw new BadRequestException('fileType is required');
+    }
+    if (!fileType.startsWith('image/')) {
+      throw new BadRequestException('Only image/* is allowed');
+    }
+  }
+
+  private extFromMime(mime: string) {
+    const map: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/heic': 'heic',
+      'image/heif': 'heif',
+      'image/gif': 'gif',
+    };
+    return map[mime] ?? 'bin';
+  }
 }

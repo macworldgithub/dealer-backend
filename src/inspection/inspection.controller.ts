@@ -18,6 +18,7 @@ import {
   ApiUnauthorizedResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorators';
 import { UserRole } from 'src/Schema/user.schema';
@@ -30,20 +31,22 @@ import { CreateInspectionDto } from './dto/create-inspection.dto';
 import { AddInspectionImageDto } from './dto/add-inspect-image.dto';
 import { UpdateInspectionImageDto } from './dto/update-inspection-image.dto';
 import { UpdateDamageDto } from './dto/update-damage.dto';
+import { PresignedFileDto } from 'src/common/dto/presigned-file.dto';
+import { AiKeyGuard } from 'src/auth/guards/ai-key.guard';
 
 type AuthedReq = Request & {
   user?: { userId: string; role: UserRole; email?: string };
 };
 
 @ApiTags('Inspection')
-@ApiBearerAuth('access-token')
-@ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('inspection')
 export class InspectionController {
   constructor(private readonly inspectionService: InspectionService) {}
 
   @Post()
+  @ApiBearerAuth('access-token')
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Create inspection (can include images + damages)' })
   @ApiCreatedResponse({ description: 'Inspection created successfully' })
   @ApiForbiddenResponse({ description: 'Insufficient role permissions' })
@@ -62,6 +65,9 @@ export class InspectionController {
   }
 
   @Post(':id/images')
+  @ApiBearerAuth('access-token')
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Add image to inspection (originalImageKey)' })
   @ApiOkResponse({ description: 'Image added successfully' })
   @ApiNotFoundResponse({ description: 'Inspection not found' })
@@ -82,6 +88,9 @@ export class InspectionController {
   }
 
   @Patch(':id/images/:imageId')
+  @ApiBearerAuth('access-token')
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Update an inspection image (analysedImageKey, aiRaw, damages)',
   })
@@ -102,6 +111,9 @@ export class InspectionController {
   }
 
   @Patch(':id/images/:imageId/damages/:damageId')
+  @ApiBearerAuth('access-token')
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Update a single damage inside an image' })
   @ApiOkResponse({ description: 'Damage updated successfully' })
   @ApiNotFoundResponse({ description: 'Inspection/image/damage not found' })
@@ -126,6 +138,9 @@ export class InspectionController {
   }
 
   @Patch(':id/status')
+  @ApiBearerAuth('access-token')
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Change inspection status' })
   @ApiOkResponse({ description: 'Inspection status updated successfully' })
   @ApiForbiddenResponse({ description: 'Insufficient role permissions' })
@@ -144,6 +159,9 @@ export class InspectionController {
   // DELETE INSPECTION (Admin only)
   // -------------------------
   @Delete(':id')
+  @ApiBearerAuth('access-token')
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Delete inspection (deletes S3 images + unlinks from vehicle)',
   })
@@ -153,5 +171,43 @@ export class InspectionController {
   @Roles(UserRole.ADMIN)
   remove(@Param('id') inspectionId: string) {
     return this.inspectionService.deleteInspection(inspectionId);
+  }
+
+  // USER: original image presigned
+  @Post('presigned/original')
+  @ApiBearerAuth('access-token')
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('access-token')
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'User: Get presigned URL for inspection ORIGINAL image upload',
+  })
+  @ApiOkResponse({ description: 'Presigned URL generated' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions' })
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.SERVICE_ADVISOR,
+    UserRole.SALES_INVENTORY_MANAGER,
+    UserRole.PORTER_DETAILER,
+  )
+  presignedOriginal(@Body() dto: PresignedFileDto) {
+    return this.inspectionService.getInspectionOriginalPresigned(dto.fileType);
+  }
+
+  // AI: analysed image presigned (server-to-server)
+  @Post('presigned/analysed-ai')
+  @UseGuards(AiKeyGuard)
+  @ApiHeader({
+    name: 'x-ai-key',
+    description: 'AI service key (server-to-server)',
+  })
+  @ApiOperation({
+    summary: 'AI: Get presigned URL for inspection ANALYSED image upload',
+  })
+  @ApiOkResponse({ description: 'Presigned URL generated' })
+  presignedAnalysedAi(@Body() dto: PresignedFileDto) {
+    return this.inspectionService.getInspectionAnalysedPresigned(dto.fileType);
   }
 }
