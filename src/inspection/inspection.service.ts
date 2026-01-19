@@ -12,6 +12,7 @@ import { Inspection, InspectionDocument } from 'src/Schema/inspection.schema';
 import { Vehicle, VehicleDocument } from 'src/Schema/vehicle.schema';
 import { CreateInspectionDto } from './dto/create-inspection.dto';
 import { InspectionStatus } from './dto/update-inspect-status.dto';
+import { InspectionByVehicleQueryDto } from './dto/inspection-by-vehicle-query.dto';
 
 type AddImageInput = {
   originalImageKey: string;
@@ -325,5 +326,136 @@ export class InspectionService {
       'image/gif': 'gif',
     };
     return map[mime] ?? 'bin';
+  }
+
+  async findByVehicleIdPaged(
+    vehicleId: string,
+    query: InspectionByVehicleQueryDto,
+  ) {
+    if (!Types.ObjectId.isValid(vehicleId))
+      throw new BadRequestException('Invalid vehicleId');
+
+    const vehicleObjId = new Types.ObjectId(vehicleId);
+
+    const vehicleExists = await this.vehicleModel.exists({ _id: vehicleObjId });
+    if (!vehicleExists) throw new NotFoundException('Vehicle not found');
+
+    const filter: any = { vehicleId: vehicleObjId };
+
+    // ✅ if inspectionId given, restrict to that inspection (still under vehicle)
+    if (query.inspectionId) {
+      if (!Types.ObjectId.isValid(query.inspectionId)) {
+        throw new BadRequestException('Invalid inspectionId');
+      }
+      filter._id = new Types.ObjectId(query.inspectionId);
+    }
+
+    if (query.status) filter.status = query.status;
+    if (query.inspectedBy)
+      filter.inspectedBy = new Types.ObjectId(query.inspectedBy);
+    if (query.inspectorRole) filter.inspectorRole = query.inspectorRole;
+
+    // pagination still works (even though inspectionId will return max 1)
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    const [items, totalItems] = await Promise.all([
+      this.inspectionModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate({ path: 'vehicleId', select: '-inspectionIds' })
+        .populate({
+          path: 'inspectedBy',
+          select: 'name email phoneNumber role',
+        })
+        .lean(),
+      this.inspectionModel.countDocuments(filter),
+    ]);
+
+    // If inspectionId was provided and nothing found -> 404
+    if (query.inspectionId && items.length === 0) {
+      throw new NotFoundException('Inspection not found for this vehicle');
+    }
+
+    // ✅ signed urls for images
+    await Promise.all(
+      items.map(async (ins: any) => {
+        if (Array.isArray(ins.images)) {
+          await Promise.all(
+            ins.images.map(async (img: any) => {
+              if (img?.originalImageKey) {
+                try {
+                  img.originalImageUrl = await this.awsService.getSignedUrl(
+                    img.originalImageKey,
+                  );
+                } catch {}
+              }
+              if (img?.analysedImageKey) {
+                try {
+                  img.analysedImageUrl = await this.awsService.getSignedUrl(
+                    img.analysedImageKey,
+                  );
+                } catch {}
+              }
+            }),
+          );
+        }
+      }),
+    );
+
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        totalItems,
+        totalPages,
+        vehicleId,
+        ...(query.inspectionId ? { inspectionId: query.inspectionId } : {}),
+      },
+    };
+  }
+
+  async findOneWithRefs(inspectionId: string) {
+    if (!Types.ObjectId.isValid(inspectionId)) {
+      throw new BadRequestException('Invalid inspectionId');
+    }
+
+    const inspection = await this.inspectionModel
+      .findById(new Types.ObjectId(inspectionId))
+      .populate({ path: 'vehicleId', select: '-inspectionIds' })
+      .populate({ path: 'inspectedBy', select: 'name email phoneNumber role' })
+      .lean();
+
+    if (!inspection) throw new NotFoundException('Inspection not found');
+
+    // ✅ add signed urls for images (ignore invalid keys)
+    if (Array.isArray((inspection as any).images)) {
+      await Promise.all(
+        (inspection as any).images.map(async (img: any) => {
+          if (img?.originalImageKey) {
+            try {
+              img.originalImageUrl = await this.awsService.getSignedUrl(
+                img.originalImageKey,
+              );
+            } catch {}
+          }
+          if (img?.analysedImageKey) {
+            try {
+              img.analysedImageUrl = await this.awsService.getSignedUrl(
+                img.analysedImageKey,
+              );
+            } catch {}
+          }
+        }),
+      );
+    }
+
+    return inspection;
   }
 }

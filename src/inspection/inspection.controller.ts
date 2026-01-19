@@ -8,6 +8,8 @@ import {
   Post,
   Req,
   Delete,
+  Get,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -19,6 +21,7 @@ import {
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiHeader,
+  ApiParam,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorators';
 import { UserRole } from 'src/Schema/user.schema';
@@ -33,6 +36,7 @@ import { UpdateInspectionImageDto } from './dto/update-inspection-image.dto';
 import { UpdateDamageDto } from './dto/update-damage.dto';
 import { PresignedFileDto } from 'src/common/dto/presigned-file.dto';
 import { AiKeyGuard } from 'src/auth/guards/ai-key.guard';
+import { InspectionByVehicleQueryDto } from './dto/inspection-by-vehicle-query.dto';
 
 type AuthedReq = Request & {
   user?: { userId: string; role: UserRole; email?: string };
@@ -42,6 +46,26 @@ type AuthedReq = Request & {
 @Controller('inspection')
 export class InspectionController {
   constructor(private readonly inspectionService: InspectionService) {}
+
+  @Get('vehicle/:vehicleId')
+  @ApiOperation({
+    summary:
+      'Get inspections by vehicleId (populate vehicle + user, add signed URLs)',
+  })
+  @ApiOkResponse({ description: 'Inspections fetched successfully' })
+  @ApiParam({ name: 'vehicleId', example: '696010fcfac0e2d2165fa5bf' })
+  // @Roles(
+  //   UserRole.ADMIN,
+  //   UserRole.SERVICE_ADVISOR,
+  //   UserRole.SALES_INVENTORY_MANAGER,
+  //   UserRole.PORTER_DETAILER,
+  // )
+  findByVehicleIdPaged(
+    @Param('vehicleId') vehicleId: string,
+    @Query() query: InspectionByVehicleQueryDto,
+  ) {
+    return this.inspectionService.findByVehicleIdPaged(vehicleId, query);
+  }
 
   @Post()
   @ApiBearerAuth('access-token')
@@ -209,5 +233,22 @@ export class InspectionController {
   @ApiOkResponse({ description: 'Presigned URL generated' })
   presignedAnalysedAi(@Body() dto: PresignedFileDto) {
     return this.inspectionService.getInspectionAnalysedPresigned(dto.fileType);
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get one inspection by inspectionId (populate + signed URLs)',
+  })
+  @ApiOkResponse({ description: 'Inspection fetched successfully' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions' })
+  @ApiParam({ name: 'id', example: '65b8f1d9a8a1f2c3d4e5f999' })
+  // @Roles(
+  //   UserRole.ADMIN,
+  //   UserRole.SERVICE_ADVISOR,
+  //   UserRole.SALES_INVENTORY_MANAGER,
+  //   UserRole.PORTER_DETAILER,
+  // )
+  getOne(@Param('id') id: string) {
+    return this.inspectionService.findOneWithRefs(id);
   }
 }
