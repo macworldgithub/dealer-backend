@@ -114,18 +114,19 @@ export class InspectionController {
   @Patch(':id/images/:imageId')
   @ApiBearerAuth('access-token')
   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Update an inspection image (analysedImageKey, aiRaw, damages)',
   })
   @ApiOkResponse({ description: 'Image updated successfully' })
   @ApiNotFoundResponse({ description: 'Inspection or image not found' })
   @ApiForbiddenResponse({ description: 'Insufficient role permissions' })
-  @Roles(
-    UserRole.ADMIN,
-    UserRole.SERVICE_ADVISOR,
-    UserRole.SALES_INVENTORY_MANAGER,
-  )
+  // @Roles(
+  //   UserRole.ADMIN,
+  //   UserRole.SERVICE_ADVISOR,
+  //   UserRole.SALES_INVENTORY_MANAGER,
+  // )
   updateImage(
     @Param('id') inspectionId: string,
     @Param('imageId') imageId: string,
@@ -137,16 +138,17 @@ export class InspectionController {
   @Patch(':id/images/:imageId/damages/:damageId')
   @ApiBearerAuth('access-token')
   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Update a single damage inside an image' })
   @ApiOkResponse({ description: 'Damage updated successfully' })
   @ApiNotFoundResponse({ description: 'Inspection/image/damage not found' })
   @ApiForbiddenResponse({ description: 'Insufficient role permissions' })
-  @Roles(
-    UserRole.ADMIN,
-    UserRole.SERVICE_ADVISOR,
-    UserRole.SALES_INVENTORY_MANAGER,
-  )
+  // @Roles(
+  //   UserRole.ADMIN,
+  //   UserRole.SERVICE_ADVISOR,
+  //   UserRole.SALES_INVENTORY_MANAGER,
+  // )
   updateDamage(
     @Param('id') inspectionId: string,
     @Param('imageId') imageId: string,
@@ -185,14 +187,15 @@ export class InspectionController {
   @Delete(':id')
   @ApiBearerAuth('access-token')
   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT token' })
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Delete inspection (deletes S3 images + unlinks from vehicle)',
   })
   @ApiOkResponse({ description: 'Inspection deleted successfully' })
   @ApiNotFoundResponse({ description: 'Inspection not found' })
   @ApiForbiddenResponse({ description: 'Insufficient role permissions' })
-  @Roles(UserRole.ADMIN)
+  // @Roles(UserRole.ADMIN)
   remove(@Param('id') inspectionId: string) {
     return this.inspectionService.deleteInspection(inspectionId);
   }
