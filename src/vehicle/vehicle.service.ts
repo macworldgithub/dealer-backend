@@ -38,6 +38,25 @@ export class VehicleService {
     }
   }
 
+  async findOne(vehicleId: string) {
+    const vehicle = await this.vehicleModel.findById(vehicleId).lean();
+
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    if (vehicle.carImageKey) {
+      try {
+        const signedUrl = await this.awsService.getSignedUrl(
+          vehicle.carImageKey,
+        );
+        (vehicle as any).carImageUrl = signedUrl;
+      } catch {}
+    }
+
+    return vehicle;
+  }
+
   async update(vehicleId: string, dto: UpdateVehicleDto) {
     const vehicle = await this.vehicleModel.findById(vehicleId);
     if (!vehicle) throw new NotFoundException('Vehicle not found');

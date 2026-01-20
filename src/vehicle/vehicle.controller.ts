@@ -45,6 +45,14 @@ export class VehicleController {
     return this.vehicleService.findAll(query);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Get single vehicle by ID' })
+  @ApiOkResponse({ description: 'Vehicle fetched successfully' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions' })
+  async findOne(@Param('id') id: string) {
+    return this.vehicleService.findOne(id);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Create vehicle (all roles allowed)' })
   @Roles(
